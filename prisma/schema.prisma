@@ -1,0 +1,296 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PEGAWAI
+  OSDM
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ChangeRequestType {
+  PROFILE
+  CERTIFICATION
+  ASSIGNMENT
+  POSITION_HISTORY
+  EDUCATION
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          Role      @default(PEGAWAI)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  employee      Employee?
+}
+
+model Employee {
+  id                String              @id @default(cuid())
+  userId            String              @unique
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nip               String              @unique
+  fullName          String
+  birthDate         DateTime?
+  birthPlace        String?
+  gender            String?
+  address           String?
+  phone             String?
+  email             String?
+  currentPosition   String?
+  unit              String?
+  golongan          String?
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  certifications    Certification[]
+  assignments       Assignment[]
+  positionHistories PositionHistory[]
+  educationHistories EducationHistory[]
+  changeRequests    ChangeRequest[]
+  jobMatches        JobMatch[]
+  assessments       Assessment[]
+  learningPaths     LearningPath[]
+}
+
+model Certification {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  name        String
+  issuer      String
+  issueDate   DateTime
+  expiryDate  DateTime?
+  credential  String?
+  description String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Assignment {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model PositionHistory {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  position    String
+  unit        String?
+  startDate   DateTime
+  endDate     DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model EducationHistory {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  degree      String
+  institution String
+  major       String?
+  startYear   Int
+  endYear     Int?
+  gpa         Float?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model JobPosition {
+  id          String       @id @default(cuid())
+  title       String       @unique
+  unit        String
+  level       String?
+  isAvailable Boolean      @default(true)
+  description String?
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  competencies JobPositionCompetency[]
+  jobMatches   JobMatch[]
+}
+
+model Competency {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  category    String    // Technical, Managerial, Sosial
+  description String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  jobPositions JobPositionCompetency[]
+}
+
+model JobPositionCompetency {
+  id            String      @id @default(cuid())
+  jobPositionId String
+  jobPosition   JobPosition @relation(fields: [jobPositionId], references: [id], onDelete: Cascade)
+  competencyId  String
+  competency    Competency  @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  
+  requiredLevel Int         @default(1) // 1-5
+  priority      String      @default("MEDIUM") // LOW, MEDIUM, HIGH
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@unique([jobPositionId, competencyId])
+}
+
+model ChangeRequest {
+  id          String              @id @default(cuid())
+  employeeId  String
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  type        ChangeRequestType
+  status      ChangeRequestStatus @default(PENDING)
+  oldData     String?             // JSON string
+  newData     String              // JSON string
+  reason      String?
+  
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String?
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model JobMatch {
+  id            String      @id @default(cuid())
+  employeeId    String
+  employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  jobPositionId String
+  jobPosition   JobPosition @relation(fields: [jobPositionId], references: [id], onDelete: Cascade)
+  
+  matchScore    Float       // 0-100
+  analysis      String      // AI analysis
+  strengths     String      // JSON array
+  gaps          String      // JSON array
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@unique([employeeId, jobPositionId])
+}
+
+// Assessment Models - Penilaian Kinerja & Potensi
+model Assessment {
+  id              String              @id @default(cuid())
+  employeeId      String
+  employee        Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  year            Int
+  period          String?             // "Semester 1", "Semester 2", "Tahunan"
+  
+  totalKinerja    Float               // Total skor Kinerja (Sumbu Y)
+  totalPotensial  Float               // Total skor Potensi (Sumbu X)
+  overallScore    Float               // Overall combined score
+  
+  boxNumber       Int                 // 1-9 (9-box position)
+  boxDescription  String?             // Deskripsi box talent
+  
+  recommendations String?             // JSON array of recommendations
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdBy       String?             // User ID yang membuat
+  
+  assessmentItems AssessmentItem[]
+  
+  @@unique([employeeId, year, period])
+}
+
+model AssessmentItem {
+  id              String     @id @default(cuid())
+  assessmentId    String
+  assessment      Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  type            String     // "KINERJA" or "POTENSIAL"
+  parameter       String     // e.g., "Kinerja - Sasaran Kinerja Pegawai"
+  komponen        String     // e.g., "Kualitas Kerja"
+  bobotKomponen   Float      // Bobot komponen (%)
+  indikator       String     // Deskripsi indikator
+  bobotIndikator  Float      // Bobot indikator dalam komponen
+  nilai           Float      // Nilai yang diberikan (0-100)
+  
+  overallPct      Float      // Percentage contribution to total
+  contribValue    Float      // Actual contribution value
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// Learning Path Models
+model LearningPath {
+  id          String              @id @default(cuid())
+  employeeId  String
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  
+  basedOnBox  Int?                // 9-box number that generated this path
+  year        Int?
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  
+  modules     LearningModule[]
+}
+
+model LearningModule {
+  id              String          @id @default(cuid())
+  learningPathId  String
+  learningPath    LearningPath    @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  
+  title           String
+  description     String?
+  status          String          @default("not-started") // "not-started", "in-progress", "completed"
+  notes           String?
+  targetDate      DateTime?
+  completedDate   DateTime?
+  
+  order           Int             @default(0) // For ordering modules
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
